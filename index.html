@@ -29,6 +29,42 @@
 </head>
 <body>
   <div id="root"></div>
+
+  <!--
+    Fehler-Fänger: zeigt eine Absturzmeldung direkt auf der Seite an,
+    statt dass die App nur weiß/leer bleibt. Damit lässt sich ein Fehler
+    auch ohne Browser-Konsole (z. B. auf dem iPhone) ablesen und weitergeben.
+    Kann dauerhaft drin bleiben.
+  -->
+  <script>
+    (function () {
+      var shown = false;
+      function showError(msg) {
+        if (shown) return;
+        shown = true;
+        var root = document.getElementById("root");
+        if (!root) return;
+        root.innerHTML =
+          '<div style="padding:20px;font-family:-apple-system,monospace;' +
+          'font-size:13px;line-height:1.5;color:#B3423F;white-space:pre-wrap;' +
+          'word-break:break-word;">' +
+          '<strong>Fehler beim Laden der App:</strong>\n\n' +
+          msg.replace(/</g, "&lt;") +
+          '</div>';
+      }
+      window.addEventListener("error", function (e) {
+        showError(
+          (e.message || "Unbekannter Fehler") +
+          "\n(" + (e.filename || "?") + ":" + (e.lineno || "?") + ":" + (e.colno || "?") + ")"
+        );
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        var r = e.reason;
+        showError("Promise-Fehler: " + (r && (r.stack || r.message) ? (r.stack || r.message) : String(r)));
+      });
+    })();
+  </script>
+
   <script src="app.bundle.js"></script>
 </body>
 </html>
