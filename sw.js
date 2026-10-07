@@ -1,4 +1,4 @@
-const CACHE_NAME = "roth-coach-v1";
+const CACHE_NAME = "roth-coach-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,20 +23,34 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Cache-first, falling back to network, so the app opens instantly and works offline
-// (e.g. mid-swim/bike/run with no signal) once it has been loaded at least once.
+// App code (index.html, app.bundle.js, sw-registered pages): network first, so a new
+// version on GitHub Pages is picked up on the next start; cache only as offline fallback.
+// Icons/manifest: cache first.
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // API calls etc. untouched
+  const isAppCode = req.mode === "navigate" || /\/(index\.html|app\.bundle\.js)?$/.test(url.pathname) || url.pathname.endsWith(".js");
+  if (isAppCode) {
+    event.respondWith(
+      fetch(req, { cache: "no-cache" })
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
           return response;
         })
-        .catch(() => cached);
-    })
+        .catch(() => caches.match(req).then((c) => c || caches.match("./index.html")))
+    );
+    return;
+  }
+  event.respondWith(
+    caches.match(req).then((cached) => cached || fetch(req).then((response) => {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      return response;
+    }))
   );
 });
